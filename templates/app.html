@@ -1,0 +1,146 @@
+{% extends "layout.html" %}
+{% block title %}Chat App{% endblock %}
+{% block page %}Chat App{% endblock %}
+
+{{ super() }}
+
+{% block content %}
+
+  <div class="row">
+    <form id="senderForm" action="/login" method="GET" class="col s6">
+      <input id="user" type="hidden" value="{{ user.username if user else 'none' }}" />
+      <div class="input-field">
+        <select name="sender" id="from" onchange="changeSender(event)">
+          <option value="none" disabled {% if not authenticated %} selected {% endif %}>Select User</option>
+          <option value="alice" {% if user.username == 'alice' %} selected {% endif %} >Alice</option>
+          <option value="bob" {% if user.username == 'bob' %} selected {% endif %} >Bob</option>
+          <option value="carl" {% if user.username == 'carl' %} selected {% endif %}>Carl</option>
+        </select>
+        <label>From User</label>
+      </div>
+    </form>
+
+    <div class="input-field col s6">
+      <select name="receiver" id="to" onchange="changeReceiver(event)">
+        <option value="none" disabled selected>Select Recipient</option>
+        <option value="alice">Alice</option>
+        <option value="bob">Bob</option>
+        <option value="carl">Carl</option>
+      </select>
+      <label>To User</label>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col s12">  
+        <textarea id="chatbox" disabled class="materialize-textarea"></textarea>
+    </div>
+  </div>
+
+  <div class="row">
+    <form name="sendForm">
+      <div class="input-field col s8">
+        <input placeholder="Placeholder" name="msgText" type="text" class="validate">
+      </div>
+      <div class="col s4">
+          <button disabled id="sendBtn" class="btn waves-effect waves-light" type="submit">Submit
+            <i class="material-icons right">send</i>
+          </button>
+      </div>
+    </form>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js"></script>
+  <script src="{{ url_for('static',filename='socket.js') }}"></script>
+
+  <script>
+
+    const server = "https://messenger.snickdx.repl.co";
+    
+    $(document).ready(function(){
+      $('select').formSelect();
+    });
+
+    function alert(html){
+        M.toast({html})
+    }
+
+    async function sendRequest(url, method, body){
+      const options = {method};
+      if(body)options.body = body;
+      const response = await fetch(url, options);
+      return response.text();
+    }
+
+    async function changeSender(event){
+      // https://stackoverflow.com/questions/7231157/how-to-submit-form-on-change-of-dropdown-list
+      event.target.form.submit();
+    }
+
+    function changeReceiver(event){
+      const receiver = event.target.value;
+      // loadChatHistory(send);
+      document.querySelector('#chatbox').value= "";
+      const sm = SocketManager.getInstance();
+      sm.emit('join_room', {to:receiver});
+
+      const user = document.querySelector('#user').value;
+      if(user !== 'none')document.querySelector('#sendBtn').removeAttribute('disabled');
+    }
+
+    function setupForm(event){
+      event.preventDefault();
+      const sm = SocketManager.getInstance();
+      const text = event.target.elements['msgText'].value;
+      const to = document.querySelector('#to').value;
+      sm.emit('message', {text, to});
+      event.target.reset();
+    }
+
+    function display(msg){
+      document.querySelector('#chatbox').value+= `\n\t${msg['from']}: ${msg['text']}`;
+    }
+
+    async function main(){
+      const sm = SocketManager.getInstance(server);
+ 
+      try{
+        const user = document.querySelector('#user').value;
+        const receiver = document.querySelector('#to').value;
+
+        if(user === 'none'){
+
+          display({ 'from': 'System', text:'❌ Not logged in, select user then recipient to begin chat.'});
+        
+        }else{
+          
+          if(receiver === 'none'){
+            display({ 'from':'System', text:`Logged in as ${user} ✔🎉`  });
+            display({ 'from':'System', text:`Select a recipient 👀`});
+          }
+            
+          const result = await sm.connect();
+
+        }
+        
+      }catch(e){
+
+        console.log(e);
+        alert("Connection Error");
+        
+      }
+
+    }
+
+    
+    SocketManager.getInstance().addCustomEventHandler('message', display);
+    SocketManager.getInstance().addEventHandler('connect', _=> display({'from' :'System', text:'Connection established 🟢!'}));
+
+    document.forms['sendForm'].addEventListener('submit', setupForm);
+
+    main();
+    
+  </script>
+{% endblock %}

@@ -1,0 +1,13 @@
+h1{
+  font-size: 4em;
+}
+
+#chatbox{
+  background-color: gainsboro;
+  height: 50vh;
+  overflow-y: scroll;
+}
+
+.container{
+  padding-top:15px;
+}
